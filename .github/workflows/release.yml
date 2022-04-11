@@ -10,6 +10,16 @@ jobs:
   release:
     name: 📦 Create GitHub release and publish to NPM
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - registry-url: 'https://registry.npmjs.org'
+            command: npm publish --access public
+            token: NPM_TOKEN
+
     steps:
       - name: Ensure main branch
         if: github.ref != 'refs/heads/main'
@@ -24,16 +34,17 @@ jobs:
       - name: Use Node.js 16.x
         uses: actions/setup-node@v2
         with:
-          node-version: 16.x
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+          scope: '@lukso'
+          cache: 'npm'
 
       - name: 🔍 Check if version changed
         uses: EndBug/version-check@v1
         if: github.event_name == 'push'
         id: check
-
       - name: 🔄 Check if should release
         run: echo "SHOULD_RELEASE=${{ steps.check.outputs.changed == 'true' || github.event_name == 'workflow_dispatch' }}" >> $GITHUB_ENV
-
       - name: 📝 Set Version
         if: env.SHOULD_RELEASE == 'true'
         run: |-
@@ -45,6 +56,7 @@ jobs:
         run: npm ci
 
       - name: 🧹 Lint
+        if: env.SHOULD_RELEASE == 'true'
         run: npm run lint
 
       - name: 🛠 Build
@@ -90,6 +102,6 @@ jobs:
 
       # Publish to NPM
       - name: Publish
-        run: npm publish --access public
+        run: ${{ matrix.command }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets[matrix.token] }}
